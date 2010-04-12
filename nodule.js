@@ -23,14 +23,14 @@ var logger = new function() {
  */
 function Entry(value) {
     this.value = value;
-    this.timestamp = new Date();
+    this.modified_at = new Date();
 }
 Entry.prototype.getValue = function() {
     return this.value;
 }
 Entry.prototype.setValue = function(value) {
     this.value = value;
-    this.timestamp = new Date();
+    this.modified_at = new Date();
     return this;
 }
 
