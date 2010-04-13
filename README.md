@@ -7,6 +7,11 @@ For example, create a 'users' keyspace with a key per ID, rather than having a b
 * Subscribe to keys by Regex pattern, and receive a data push when the key is modified by another client.
 * Client library written in Ruby.
 
+## Installation and Execution
+1. Install Node.js from http://nodejs.org
+2. Clone this git repository.
+3. $ node nodule.js
+
 ## Examples
 ### Set and Get
     n = Nodule::Client.new
