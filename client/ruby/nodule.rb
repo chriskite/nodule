@@ -47,6 +47,7 @@ module Nodule
     end
     
     def subscribe(space, pattern, &block)
+      pattern = pattern.to_s
       add_callback(space, pattern, block)
       # send the subscription request
       send_data({:op => :sub, :space => space, :pattern => pattern}.to_json)

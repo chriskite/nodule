@@ -7,7 +7,8 @@ var PORT = 13823;
 
 var STATUS_OK = 0;
 var E_INVALID_REQUEST = 1,
-    E_UNKNOWN_CMD = 2;
+    E_UNKNOWN_CMD = 2,
+    E_INVALID_PATTERN = 3;
 
 /*
  * Handle logging to STDOUT if LOGGING == true.
@@ -43,6 +44,11 @@ function Space(name) {
     this.patterns = {};
 }
 Space.prototype.addSubscription = function(pattern, session_id) {
+    try {
+        new RegExp(pattern);
+    } catch(err) {
+        return E_INVALID_PATTERN;
+    }
     logger.log('Space: ' + this.name + ' ' + session_id + ' SUBSCRIBE ' + pattern);
     if(!this.patterns[pattern]) this.patterns[pattern] = {};
     this.patterns[pattern][session_id] = null;
