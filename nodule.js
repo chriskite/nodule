@@ -59,6 +59,11 @@ Space.prototype.publish = function(key, entry) {
         }
     }
 };
+Space.prototype.gcSession = function(session_id) {
+    for(var p in this.patterns) {
+        delete this.patterns[p][session_id];
+    }
+};
 
 /*
  * A session for a connected client.
@@ -78,6 +83,12 @@ var sessions = {}; // track all connected sessions
  */
 var store = new function() {
     var spaces = {};
+
+    this.gcSession = function(session_id) {
+        for(var i in spaces) {
+            spaces[i].gcSession(session_id);
+        }
+    };
 
     this.get = function(space_name, key) {
         logger.log('Store:     GET Space:' + space_name + ' Key:' + key);
@@ -162,21 +173,25 @@ var processor = new function() {
  */
 var server = net.createServer(function (stream) {
   stream.setEncoding('utf8');
-  stream.addListener('connect', function () {
+  stream.addListener('connect', function() {
     // create a session for this client
     stream.session = new Session(stream);
     sessions[stream.session.id] = stream.session;
     logger.log('Server:    CONNECT    ' + stream.session.id + ' from ' + stream.remoteAddress);
   });
-  stream.addListener('data', function (data) {
+  stream.addListener('data', function(data) {
     logger.log('Server:    RECEIVE    ' + stream.session.id + ' from ' + stream.remoteAddress + ' ' + data);
     processor.process(data, stream.session);
   });
-  stream.addListener('end', function () {
+  stream.addListener('end', function() {
     logger.log('Server:    DISCONNECT ' + stream.session.id + ' from ' + stream.remoteAddress);
     stream.end();
+  });
+  stream.addListener('close', function() {
     // GC the session
-    delete sessions[stream.session.id];
+    var session_id = stream.session.id;
+    store.gcSession(session_id);
+    delete sessions[session_id];
     delete stream.session;
   });
 });
