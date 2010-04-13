@@ -35,6 +35,15 @@ Entry.prototype.setValue = function(value) {
 }
 
 /*
+ * A key space, which contains Entires and subscription patterns.
+ */
+function Space(name) {
+    this.name = name;
+    this.entries = {};
+    this.patterns = {};
+}
+
+/*
  * A session for a connected client.
  */
 function Session(stream) {
@@ -45,30 +54,32 @@ Session.prototype.sendAsJSON = function(data) {
     this.stream.write(JSON.stringify(data) + "\n");
 };
 
+var sessions = {}; // track all connected sessions
+
 /*
  * Store the entries and mitigate access.
  */
 var store = new function() {
     var spaces = {};
 
-    this.get = function(space, key) {
-        logger.log('Store:     GET Space:' + space + ' Key:' + key);
-        var entries = spaces[space];
-        if(!entries) entries = spaces[space] = {};
-        var entry = entries[key];
+    this.get = function(space_name, key) {
+        logger.log('Store:     GET Space:' + space_name + ' Key:' + key);
+        var space = spaces[space_name];
+        if(!space) return null;
+        var entry = space.entries[key];
         if(!entry) return null;
         return entry.getValue();
     };
 
-    this.set = function(space, key, value) {
-        logger.log('Store:     SET Space:' + space + ' Key:' + key + ' Value:' + value);
-        var entries = spaces[space];
-        if(!entries) entries = spaces[space] = {};
-        var entry = entries[key];
+    this.set = function(space_name, key, value) {
+        logger.log('Store:     SET Space:' + space_name + ' Key:' + key + ' Value:' + value);
+        var space = spaces[space_name];
+        if(!space) space = spaces[space_name] = new Space(space_name);
+        var entry = space.entries[key];
         if(entry) {
             entry.setValue(value);
         } else {
-            entries[key] = new Entry(value);
+            space.entries[key] = new Entry(value);
         }
         return STATUS_OK;
     };
@@ -122,6 +133,7 @@ var server = net.createServer(function (stream) {
   stream.addListener('connect', function () {
     // create a session for this client
     stream.session = new Session(stream);
+    sessions[stream.session.id] = stream.session;
     logger.log('Server:    CONNECT    ' + stream.session.id + ' from ' + stream.remoteAddress);
   });
   stream.addListener('data', function (data) {
@@ -131,6 +143,8 @@ var server = net.createServer(function (stream) {
   stream.addListener('end', function () {
     logger.log('Server:    DISCONNECT ' + stream.session.id + ' from ' + stream.remoteAddress);
     stream.end();
+    // GC the session
+    delete sessions[stream.session.id];
     delete stream.session;
   });
 });

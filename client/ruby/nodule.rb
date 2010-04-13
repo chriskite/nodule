@@ -59,8 +59,11 @@ module Nodule
   
 end
 
-n = Nodule::Client.new
-n.subscription do
-  subscribe('global', 'test') { |space, key, value| puts value }
-end
+#n = Nodule::Client.new
+#n.subscription do
+#  subscribe('global', 'test') { |space, key, value| puts value }
+#end
 
+n = Nodule::Client.new
+n.set 'global', 'test', 'testval'
+puts n.get 'global', 'test'
