@@ -49,18 +49,22 @@ Session.prototype.sendAsJSON = function(data) {
  * Store the entries and mitigate access.
  */
 var store = new function() {
-    var entries = {};
+    var spaces = {};
 
     this.get = function(space, key) {
         logger.log('Store:     GET Space:' + space + ' Key:' + key);
-        entry = entries[key];
+        var entries = spaces[space];
+        if(!entries) entries = spaces[space] = {};
+        var entry = entries[key];
         if(!entry) return null;
         return entry.getValue();
     };
 
     this.set = function(space, key, value) {
         logger.log('Store:     SET Space:' + space + ' Key:' + key + ' Value:' + value);
-        entry = entries[key];
+        var entries = spaces[space];
+        if(!entries) entries = spaces[space] = {};
+        var entry = entries[key];
         if(entry) {
             entry.setValue(value);
         } else {
