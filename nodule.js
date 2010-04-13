@@ -42,6 +42,23 @@ function Space(name) {
     this.entries = {};
     this.patterns = {};
 }
+Space.prototype.addSubscription = function(pattern, session_id) {
+    logger.log('Space: ' + this.name + ' ' + session_id + ' SUBSCRIBE ' + pattern);
+    if(!this.patterns[pattern]) this.patterns[pattern] = {};
+    this.patterns[pattern][session_id] = null;
+    return STATUS_OK;
+};
+Space.prototype.publish = function(key, entry) {
+    for(var p in this.patterns) {
+        var regex = new RegExp(p);
+        if(key.match(regex)) {
+            for(var id in this.patterns[p]) {
+                // publish this key to the session
+                sessions[id].sendAsJSON({space: this.name, key: key, value: entry.getValue()});
+            }
+        }
+    }
+};
 
 /*
  * A session for a connected client.
@@ -79,9 +96,17 @@ var store = new function() {
         if(entry) {
             entry.setValue(value);
         } else {
-            space.entries[key] = new Entry(value);
+            entry = space.entries[key] = new Entry(value);
         }
+        space.publish(key, entry);
         return STATUS_OK;
+    };
+    
+    this.sub = function(space_name, pattern, session_id) {
+        logger.log('Store:     SUB Space:' + space_name + ' Pattern: ' + pattern);
+        var space = spaces[space_name];
+        if(!space) space = spaces[space_name] = new Space(space_name);
+        return space.addSubscription(pattern, session_id);
     };
 };
 
@@ -101,6 +126,7 @@ var processor = new function() {
         switch(cmd['op']) {
             case 'get': this.get(cmd, session); break;
             case 'set': this.set(cmd, session); break;
+            case 'sub': this.sub(cmd, session); break;
             default: 
                 logger.log('Processor: Unknown command "' + cmd['op'] + '"');
                 this.error(E_UNKNOWN_CMD, session);
@@ -122,7 +148,13 @@ var processor = new function() {
         logger.log('Processor: SET');
         var r = store.set(cmd['space'], cmd['key'], cmd['value']);
         session.sendAsJSON({'status': r});
-    };    
+    };   
+    
+    this.sub = function(cmd, session) {
+        logger.log('Processor: SUB');
+        var r = store.sub(cmd['space'], cmd['pattern'], session.id);
+        session.sendAsJSON({'status': r});
+    };       
 };
 
 /*

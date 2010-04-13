@@ -6,6 +6,12 @@ require 'pp'
 
 module Nodule
 
+  def self.subscription(addr = 'localhost', port = 13823, &block)
+    EventMachine::run do
+      EventMachine::connect(addr, port, Nodule::Subscription).instance_eval(&block)
+    end
+  end
+
   class Client
     def initialize(addr = 'localhost', port = 13823)
       @socket = TCPSocket.new(addr, port)
@@ -27,12 +33,6 @@ module Nodule
       self
     end
     
-    def subscription(&block)
-      EventMachine::run do
-        EventMachine::connect('localhost', 13823, Nodule::Subscription).instance_eval(&block)
-      end
-    end
-    
     def destroy
       @socket.close
     end
@@ -40,30 +40,33 @@ module Nodule
   
   module Subscription
     def receive_data(data)
-      p data
+      data.split("\n").each do |json|
+        response = JSON.parse(json)
+        do_callbacks(response['space'], response['key'], response['value'])
+      end
     end
     
-    def subscribe(space, key, &block)
-      add_callback(space, key, block)
+    def subscribe(space, pattern, &block)
+      add_callback(space, pattern, block)
       # send the subscription request
-      send_data({:op => :sub, :space => space, :key => key}.to_json)
+      send_data({:op => :sub, :space => space, :pattern => pattern}.to_json)
     end
     
-    def add_callback(space, key, block)
+    def add_callback(space, pattern, block)
       @callbacks ||= {}
       @callbacks[space] ||= {}
-      @callbacks[space][key] ||= []
-      @callbacks[space][key] << block
+      @callbacks[space][pattern] ||= []
+      @callbacks[space][pattern] << block
     end
+    
+    def do_callbacks(space, key, value)
+      return unless !!@callbacks[space]
+      @callbacks[space].each_key do |pattern|
+        if key =~ Regexp.new(pattern)
+          @callbacks[space][pattern].each { |blk| blk.call(space, key, value) }
+        end
+      end
+    end    
   end
   
 end
-
-#n = Nodule::Client.new
-#n.subscription do
-#  subscribe('global', 'test') { |space, key, value| puts value }
-#end
-
-n = Nodule::Client.new
-n.set 'global', 'test', 'testval'
-puts n.get 'global', 'test'
